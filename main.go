@@ -8,201 +8,179 @@ import (
 	"io"
 )
 
+const (
+    ErrInvalidInput    = "некорректный ввод"
+    ErrNotADirectory   = "второй аргумент не является существующей директорией"
+    ErrReadDir         = "ошибка при чтении каталога"
+    ErrCreateDir       = "ошибка при создании директории"
+    ErrOpenFile        = "невозможно открыть файл"
+    ErrCreateFile      = "невозможно создать файл"
+    ErrDeleteFile      = "не удалось удалить файл"
+	ErrReadFile        = "ошибка при чтении файла"
+	ErrWriteFile       = "ошибка при записи файла"
+)
+
 var buffer = make([]byte, 512*1024)
 
+type fileInfo struct {
+	filename string
+	extension string
+}
+
+type dirInfo struct {
+	files 	[]fileInfo
+	folders map[string]struct{}
+	workDir string
+}
+
 func main() {
+	var objects dirInfo
 	var err error
 
-	workDir, err := GetWorkDir()
+	objects, err = GetWorkDir()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	files, folders, err := GetFilesFromWorkDir(workDir)
+
+	err = GetObjectsFromWorkDir(&objects)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	err = DirChecker(files, folders, workDir)
+
+	err = GetExtensions(&objects)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	err = MoveFiles(files, workDir)
+
+	err = CreateDir(&objects)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	err = CopyAndDeleteFiles(objects)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 }
 
-func GetWorkDir() (string, error) {
-	var err error
-	workDir := ""
+func GetWorkDir() (objects dirInfo, err error) {
+	objects.workDir = ""
+	objects.folders = make(map[string]struct{})
+
 	if len(os.Args) == 1 {
-		workDir = "./"
-	} else if len(os.Args) == 2 {
-		info, err := os.Stat(os.Args[1])
-		if err != nil {
-			err = errors.New("второй аргумент не является существующей директорией")
-			return workDir, err
-		}
-		if info.IsDir() {
-			workDir = os.Args[1] + "/"
-		} else {
-			err = errors.New("второй аргумент не является существующей директорией")
-			return workDir, err
-		}
+		objects.workDir = "./"
+		return
 	}
-	if workDir == "" {
-		err = errors.New("некорректный ввод")
-		return workDir, err
+	
+	if len(os.Args) != 2 {
+		return objects, errors.New(ErrInvalidInput)
 	}
-	return workDir, nil
+	
+	info, err := os.Stat(os.Args[1])
+	if err != nil {
+		return objects, errors.New(ErrNotADirectory)
+	}
+
+	if info.IsDir() {
+		objects.workDir = os.Args[1] + "/"
+	} else {
+		err = errors.New(ErrNotADirectory)
+	}
+	return
 }
 
-func GetFilesFromWorkDir(workDir string) ([]string, []string, error) {
-	var err error
-	var files []string
-	var folders []string
-	entries, err := os.ReadDir(workDir)
+func GetObjectsFromWorkDir(objects *dirInfo) (err error) {
+	entries, err := os.ReadDir(objects.workDir)
 	if err != nil {
-		err = errors.New("ошибка при чтении каталога")
-		return nil, nil, err
+		return errors.New(ErrReadDir)
 	}
+
 	for _, entry := range entries {
 		if entry.IsDir() {
-			folders = append(folders, entry.Name())
+			objects.folders[entry.Name()] = struct{}{}
 		} else if (entry.Name() != "go.mod") && (entry.Name() != "main.go") {
-			files = append(files, entry.Name())
+			file := fileInfo{filename: entry.Name(), extension: ""}
+			objects.files = append(objects.files, file)
 		}
 	}
-	return files, folders, nil
+
+	return
 }
 
-func DirChecker(files []string, folders []string, workDir string) (error) {
-	var err error
-	var extensions []string
-	isEmptyExtension := false
-	for _, value := range files {
-		dotIndex := strings.Index(value, ".")
+func GetExtensions(objects *dirInfo) (err error) {
+	for i := range objects.files {
+		dotIndex := strings.Index(objects.files[i].filename, ".")
 		if dotIndex != -1 {
-			extensions = append(extensions, value[dotIndex + 1:])
+			objects.files[i].extension = objects.files[i].filename[dotIndex + 1:] + "_folder"
 		} else {
-			isEmptyExtension = true
+			objects.files[i].extension = "for_empty_extension_folder"
 		}
 	}
-	err = CreateDir(extensions, folders, isEmptyExtension, workDir)
-	if err != nil {
-		return err
-	}
-	return nil
+	return
 }
 
-func CreateDir(extensions []string, folders []string, isEmptyExtension bool, workDir string) (error) {
-	var err error
-	flag := false
-	if isEmptyExtension {
-		for _, value := range folders {
-			if value == "for_empty_extension_folder" {
-				flag = true
-				break
-			}
-		}
-		if !flag {
-			err = os.Mkdir(workDir + "for_empty_extension_folder", 0755)
+func CreateDir(objects *dirInfo) (err error) {
+	for _, value := range objects.files {
+		if _, exists := objects.folders[value.extension]; exists {
+			continue
+		} else {
+			err = os.Mkdir(objects.workDir + value.extension, 0755)
 			if err != nil {
-				err = errors.New("ошибка при создании директории")
-				return err
+				return errors.New(ErrCreateDir)
 			}
-			folders = append(folders, "for_empty_extension_folder")
+			objects.folders[value.extension] = struct{}{}
 		}
-		flag = false
 	}
-	for _, value := range extensions {
-		for _, dirValue := range folders {
-			if value + "_folder" == dirValue {
-				flag = true
-				break
-			}
-		}
-		if !flag {
-			err = os.Mkdir(workDir + value + "_folder", 0755)
-			if err != nil {
-				err = errors.New("ошибка при создании директории")
-				return err
-			}
-			folders = append(folders, value)
-		}
-		flag = false
-	}
-	return nil
+	return
 }
 
-func MoveFiles(files []string, workDir string) error {
-	var err error
-	for _, value := range files {
-		err = CopyFiles(value, workDir)
+func CopyAndDeleteFiles(objects dirInfo) (err error) {
+	for _, value := range objects.files {
+		filePathDst := objects.workDir + value.extension + "/" + value.filename
+		filePathSrc := objects.workDir + value.filename
+
+		err = WriteFiles(filePathDst, filePathSrc)
 		if err != nil {
-			return err
+			return
+		}
+
+		err = os.Remove(filePathSrc)
+		if err != nil {
+			return errors.New(ErrDeleteFile)
 		}
 	}
-	err = DeleteFiles(files, workDir)
-	if err != nil {
-		return err
-	}
-	return nil
+	return
 }
 
-func CopyFiles(file string, workDir string) error {
-	var err error
-	var extension string
-	dotIndex := strings.Index(file, ".")
-	if dotIndex != -1 {
-		extension = file[dotIndex+1:]
-	} else {
-		extension = "for_empty_extension"
-	}
-	filePathDst := workDir + extension + "_folder" + "/" + file
-	filePathSrc := workDir + file
+func WriteFiles(filePathDst string, filePathSrc string) (err error) {
 	srcFile, err := os.Open(filePathSrc)
 	if err != nil {
-		err = errors.New("невозможно открыть файл")
-		return err
+		return errors.New(ErrOpenFile)
 	}
 	defer srcFile.Close()
+
 	dstFile, err := os.Create(filePathDst)
 	if err != nil {
-		err = errors.New("невозможно создать файл")
-		return err
+		return errors.New(ErrCreateFile)
 	}
 	defer dstFile.Close()
+
 	for {
 		n, err := srcFile.Read(buffer)
 		if err != nil && err != io.EOF {
-			err = errors.New("ошибка при чтении файла")
-			return err
+			return errors.New(ErrReadFile)
 		}
 		if n == 0 {
-			break
+			return nil
 		}
 		_, err = dstFile.Write(buffer[:n])
 		if err != nil {
-			err = errors.New("ошибка при записи файла")
-			return err
+			return errors.New(ErrWriteFile)
 		}
 	}
-	return nil
-}
-
-func DeleteFiles(files []string, workDir string) error {
-	var err error
-	for _, value := range files {
-		filePath := workDir + "/" + value
-		err = os.Remove(filePath)
-		if err != nil {
-			err = errors.New("не удалось удалить файл")
-			return err
-		}
-	}
-	return nil
 }
