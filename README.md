@@ -12,4 +12,4 @@
 1. Убедитесь что установлен Go 1.20+
 2. Клонируйте репозиторий:
    ```bash
-   git clone https://github.com/yourusername/file-organizer.git
+   git clone https://github.com/Bieroid/file_distributor.git
