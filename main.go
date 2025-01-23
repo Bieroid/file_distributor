@@ -144,7 +144,7 @@ func CopyAndDeleteFiles(objects dirInfo) (err error) {
 		filePathDst := objects.workDir + value.extension + "/" + value.filename
 		filePathSrc := objects.workDir + value.filename
 
-		err = WriteFiles(filePathDst, filePathSrc)
+		err = CopyFiles(filePathDst, filePathSrc)
 		if err != nil {
 			return
 		}
@@ -157,7 +157,7 @@ func CopyAndDeleteFiles(objects dirInfo) (err error) {
 	return
 }
 
-func WriteFiles(filePathDst string, filePathSrc string) (err error) {
+func CopyFiles(filePathDst string, filePathSrc string) (err error) {
 	srcFile, err := os.Open(filePathSrc)
 	if err != nil {
 		return errors.New(ErrOpenFile)
