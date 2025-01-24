@@ -37,38 +37,38 @@ func main() {
 	var objects dirInfo
 	var err error
 
-	objects, err = GetWorkDir()
+	objects, err = getWorkDir()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	err = GetObjectsFromWorkDir(&objects)
+	err = getObjectsFromWorkDir(&objects)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	err = GetExtensions(&objects)
+	err = getExtensions(&objects)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	err = CreateDir(&objects)
+	err = createDir(&objects)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	err = CopyAndDeleteFiles(objects)
+	err = copyAndDeleteFiles(objects)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 }
 
-func GetWorkDir() (objects dirInfo, err error) {
+func getWorkDir() (objects dirInfo, err error) {
 	objects.workDir = ""
 	objects.folders = make(map[string]struct{})
 
@@ -94,7 +94,7 @@ func GetWorkDir() (objects dirInfo, err error) {
 	return
 }
 
-func GetObjectsFromWorkDir(objects *dirInfo) (err error) {
+func getObjectsFromWorkDir(objects *dirInfo) (err error) {
 	entries, err := os.ReadDir(objects.workDir)
 	if err != nil {
 		return errors.New(ErrReadDir)
@@ -112,7 +112,7 @@ func GetObjectsFromWorkDir(objects *dirInfo) (err error) {
 	return
 }
 
-func GetExtensions(objects *dirInfo) (err error) {
+func getExtensions(objects *dirInfo) (err error) {
 	for i := range objects.files {
 		dotIndex := strings.Index(objects.files[i].filename, ".")
 		if dotIndex != -1 {
@@ -124,7 +124,7 @@ func GetExtensions(objects *dirInfo) (err error) {
 	return
 }
 
-func CreateDir(objects *dirInfo) (err error) {
+func createDir(objects *dirInfo) (err error) {
 	for _, value := range objects.files {
 		if _, exists := objects.folders[value.extension]; exists {
 			continue
@@ -139,12 +139,12 @@ func CreateDir(objects *dirInfo) (err error) {
 	return
 }
 
-func CopyAndDeleteFiles(objects dirInfo) (err error) {
+func copyAndDeleteFiles(objects dirInfo) (err error) {
 	for _, value := range objects.files {
 		filePathDst := objects.workDir + value.extension + "/" + value.filename
 		filePathSrc := objects.workDir + value.filename
 
-		err = CopyFiles(filePathDst, filePathSrc)
+		err = copyFiles(filePathDst, filePathSrc)
 		if err != nil {
 			return
 		}
@@ -157,7 +157,7 @@ func CopyAndDeleteFiles(objects dirInfo) (err error) {
 	return
 }
 
-func CopyFiles(filePathDst string, filePathSrc string) (err error) {
+func copyFiles(filePathDst string, filePathSrc string) (err error) {
 	srcFile, err := os.Open(filePathSrc)
 	if err != nil {
 		return errors.New(ErrOpenFile)
